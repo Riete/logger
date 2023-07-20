@@ -2,6 +2,7 @@ package logger
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -94,6 +95,10 @@ func (l *Logger) Error(msg ...any) {
 
 func (l *Logger) Log(msg ...any) {
 	l.write("", msg...)
+}
+
+func (l *Logger) Writer() io.Writer {
+	return l.logger.Writer()
 }
 
 func NewLogger(filename string, options ...Option) *Logger {
