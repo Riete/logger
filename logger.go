@@ -71,13 +71,13 @@ func (l *Logger) rotate() {
 	l.logger.SetOutput(l.f)
 }
 
-func (l *Logger) write(prefix string, msg ...any) {
+func (l *Logger) write(prefix string, v ...any) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 	if prefix != "" {
-		msg = append([]any{prefix}, msg...)
+		v = append([]any{prefix}, v...)
 	}
-	l.logger.Println(msg...)
+	l.logger.Println(v...)
 	s, _ := l.f.Stat()
 	if s.Size() >= l.maxSizePerFile {
 		_ = l.f.Close()
@@ -85,16 +85,27 @@ func (l *Logger) write(prefix string, msg ...any) {
 	}
 }
 
-func (l *Logger) Info(msg ...any) {
-	l.write("[INFO]", msg...)
+func (l *Logger) Printf(format string, v ...any) {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	l.logger.Printf(format, v...)
+	s, _ := l.f.Stat()
+	if s.Size() >= l.maxSizePerFile {
+		_ = l.f.Close()
+		l.rotate()
+	}
 }
 
-func (l *Logger) Error(msg ...any) {
-	l.write("[ERROR]", msg...)
+func (l *Logger) Info(v ...any) {
+	l.write("[INFO]", v...)
 }
 
-func (l *Logger) Log(msg ...any) {
-	l.write("", msg...)
+func (l *Logger) Error(v ...any) {
+	l.write("[ERROR]", v...)
+}
+
+func (l *Logger) Log(v ...any) {
+	l.write("", v...)
 }
 
 func (l *Logger) Writer() io.Writer {
