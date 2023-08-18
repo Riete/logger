@@ -1,16 +1,41 @@
 package logger
 
 import (
+	"log/slog"
 	"testing"
-	"time"
 )
 
+var w = NewFileWriter("test.log")
+
 func TestNewLogger(t *testing.T) {
-	info := NewLogger("info.log", WithBase("loogs"), WithMaxRotate(10), WithMaxSizePerFile(50*SizeMiB))
+	l := NewLogger(slog.LevelInfo, w)
 	for {
-		info.Info("a", "b", "c")
-		info.Error("aa", "bb", "cc")
-		info.Log("aaa", "bbb", "ccc")
-		time.Sleep(time.Millisecond)
+		l.Debug("debug")
+		l.Info("info")
+		l.Warn("warn")
+		l.Error("error")
+		_, _ = l.Write([]byte("xxxxxxxxxxxxx\n"))
+	}
+}
+
+func TestNewJSONLogger(t *testing.T) {
+	l := NewJSONLogger(slog.LevelInfo, w)
+	for {
+		l.Debug("debug")
+		l.Info("info")
+		l.Warn("warn")
+		l.Error("error")
+		_, _ = l.Write([]byte("xxxxxxxxxxxxx\n"))
+	}
+}
+
+func TestNewTextLogger(t *testing.T) {
+	l := NewTextLogger(slog.LevelInfo, w)
+	for {
+		l.Debug("debug")
+		l.Info("info")
+		l.Warn("warn")
+		l.Error("error")
+		_, _ = l.Write([]byte("xxxxxxxxxxxxx\n"))
 	}
 }
