@@ -48,10 +48,6 @@ func (l *Logger) Write(p []byte) (int, error) {
 	return l.w.Write(p)
 }
 
-func (l *Logger) Writer() io.Writer {
-	return l
-}
-
 // NewJSONLogger json log format, support write to multi writer
 func NewJSONLogger(w io.Writer, others ...io.Writer) *Logger {
 	if len(others) > 0 {

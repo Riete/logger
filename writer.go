@@ -1,10 +1,15 @@
 package logger
 
 import (
+	"bufio"
+	"bytes"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
+	"time"
 )
 
 type FileWriter struct {
@@ -12,10 +17,12 @@ type FileWriter struct {
 	rotator Rotator
 	path    string
 	wSize   *atomic.Int64
+	bw      *bufio.Writer
 }
 
 func (f *FileWriter) open() {
 	f.f, _ = os.OpenFile(f.path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	f.bw = bufio.NewWriter(f.f)
 }
 
 func (f *FileWriter) loadSize() {
@@ -23,14 +30,16 @@ func (f *FileWriter) loadSize() {
 	f.wSize.Store(fs.Size())
 }
 
-func (f *FileWriter) Writer() io.Writer {
-	return f
+func (f *FileWriter) Close() error {
+	_ = f.bw.Flush()
+	return f.f.Close()
 }
 
 func (f *FileWriter) Write(p []byte) (int, error) {
-	n, err := f.f.Write(p)
+	n, err := f.bw.Write(p)
 	f.wSize.Add(int64(n))
 	if f.wSize.Load() >= f.rotator.MaxSize() {
+		_ = f.bw.Flush()
 		_ = f.f.Close()
 		f.rotator.Rotate(f.path)
 		f.open()
@@ -39,10 +48,71 @@ func (f *FileWriter) Write(p []byte) (int, error) {
 	return n, err
 }
 
-func NewFileWriter(path string, rotator Rotator) *FileWriter {
+func NewFileWriter(path string, rotator Rotator) io.WriteCloser {
 	_ = os.MkdirAll(filepath.Dir(path), 0755)
 	fw := &FileWriter{path: path, rotator: rotator, wSize: new(atomic.Int64)}
 	fw.open()
 	fw.loadSize()
 	return fw
+}
+
+type NetworkWriter struct {
+	conn       net.Conn
+	network    string
+	addr       string
+	err        error
+	maxBufSize int
+	buf        *bytes.Buffer
+	l          sync.RWMutex
+}
+
+func (n *NetworkWriter) dial() {
+	n.l.Lock()
+	defer n.l.Unlock()
+	if n.err == nil && n.conn != nil {
+		return
+	}
+	n.conn, n.err = net.DialTimeout(n.network, n.addr, 5*time.Second)
+}
+
+func (n *NetworkWriter) bufWrite(p []byte) (int, error) {
+	if n.buf.Len() >= n.maxBufSize {
+		_ = n.buf.Next(len(p))
+	}
+	return n.buf.Write(p)
+}
+
+func (n *NetworkWriter) Write(p []byte) (int, error) {
+	var rn int
+	if n.err != nil || n.conn == nil {
+		go n.dial()
+		return n.bufWrite(p)
+	}
+	if n.buf.Len() > 0 {
+		_, _ = n.conn.Write(n.buf.Bytes())
+		n.buf.Reset()
+	}
+	rn, n.err = n.conn.Write(p)
+	if n.err != nil {
+		_, _ = n.bufWrite(p)
+	}
+	return rn, n.err
+}
+
+func (n *NetworkWriter) Close() error {
+	if n.err == nil {
+		n.err = n.conn.Close()
+	}
+	return n.err
+}
+
+func NewNetworkWriter(network, addr string, maxBufSize int) io.WriteCloser {
+	w := &NetworkWriter{
+		network:    network,
+		addr:       addr,
+		maxBufSize: maxBufSize,
+		buf:        new(bytes.Buffer),
+	}
+	w.dial()
+	return w
 }
