@@ -25,9 +25,6 @@ func (l *Logger) SetGroup(group string) {
 }
 
 func (l *Logger) log(level slog.Level, msg string, args ...any) {
-	if l.logger.Enabled(context.Background(), slog.LevelDebug) {
-		slog.Log(context.Background(), level, msg, args...)
-	}
 	l.logger.Log(context.Background(), level, msg, args...)
 }
 
@@ -55,7 +52,11 @@ func (l *Logger) Writer() io.Writer {
 	return l
 }
 
-func NewJSONLogger(w io.Writer) *Logger {
+// NewJSONLogger json log format, support write to multi writer
+func NewJSONLogger(w io.Writer, others ...io.Writer) *Logger {
+	if len(others) > 0 {
+		w = io.MultiWriter(append(others, w)...)
+	}
 	level := new(slog.LevelVar)
 	return &Logger{
 		logger: slog.New(slog.NewJSONHandler(w, &slog.HandlerOptions{Level: level})),
@@ -64,7 +65,11 @@ func NewJSONLogger(w io.Writer) *Logger {
 	}
 }
 
-func NewTextLogger(w io.Writer) *Logger {
+// NewTextLogger text log format, support write to multi writer
+func NewTextLogger(w io.Writer, others ...io.Writer) *Logger {
+	if len(others) > 0 {
+		w = io.MultiWriter(append(others, w)...)
+	}
 	level := new(slog.LevelVar)
 	return &Logger{
 		logger: slog.New(slog.NewTextHandler(w, &slog.HandlerOptions{Level: level})),
