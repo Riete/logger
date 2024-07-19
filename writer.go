@@ -18,6 +18,7 @@ type FileWriter struct {
 	path    string
 	wSize   *atomic.Int64
 	bw      *bufio.Writer
+	flushAt time.Time
 }
 
 func (f *FileWriter) open() {
@@ -35,6 +36,13 @@ func (f *FileWriter) Close() error {
 	return f.f.Close()
 }
 
+func (f *FileWriter) flush() {
+	if time.Now().Add(-time.Second).After(f.flushAt) && f.bw.Buffered() > 0 {
+		_ = f.bw.Flush()
+		f.flushAt = time.Now()
+	}
+}
+
 func (f *FileWriter) Write(p []byte) (int, error) {
 	n, err := f.bw.Write(p)
 	f.wSize.Add(int64(n))
@@ -45,12 +53,13 @@ func (f *FileWriter) Write(p []byte) (int, error) {
 		f.open()
 		f.wSize.Store(0)
 	}
+	f.flush()
 	return n, err
 }
 
 func NewFileWriter(path string, rotator Rotator) io.WriteCloser {
 	_ = os.MkdirAll(filepath.Dir(path), 0755)
-	fw := &FileWriter{path: path, rotator: rotator, wSize: new(atomic.Int64)}
+	fw := &FileWriter{path: path, rotator: rotator, wSize: new(atomic.Int64), flushAt: time.Now()}
 	fw.open()
 	fw.loadSize()
 	return fw
