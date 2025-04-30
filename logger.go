@@ -2,6 +2,7 @@ package logger
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 )
@@ -46,6 +47,25 @@ func (l *Logger) Error(msg string, args ...any) {
 
 func (l *Logger) Write(p []byte) (int, error) {
 	return l.w.Write(p)
+}
+
+func (l *Logger) Print(v ...any) {
+	if len(v) == 0 {
+		l.Info("")
+	}
+	msg, ok := v[0].(string)
+	if !ok {
+		msg = fmt.Sprintf("%v", v[0])
+	}
+	l.Info(msg, v[1:]...)
+}
+
+func (l *Logger) Println(v ...any) {
+	l.Print(v...)
+}
+
+func (l *Logger) Printf(format string, v ...any) {
+	l.Info(fmt.Sprintf(format, v...))
 }
 
 // NewJSONLogger json log format, support write to multi writer
