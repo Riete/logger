@@ -95,7 +95,9 @@ func (n *NetworkWriter) Write(p []byte) (int, error) {
 	var rn int
 	if n.err != nil || n.conn == nil {
 		go n.dial()
-		return n.bufWrite(p)
+		if n.maxBufSize > 0 {
+			return n.bufWrite(p)
+		}
 	}
 	if n.buf.Len() > 0 {
 		_, _ = n.conn.Write(n.buf.Bytes())
@@ -115,6 +117,10 @@ func (n *NetworkWriter) Close() error {
 	return n.err
 }
 
+// NewNetworkWriter
+// if maxBufSize > 0, when data written to the remote server failed
+// it will be cached in memory using a maximum of maxBufSize
+// old data will be discarded if the maxBufSize is reached
 func NewNetworkWriter(network, addr string, maxBufSize int) io.WriteCloser {
 	w := &NetworkWriter{
 		network:    network,
