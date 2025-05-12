@@ -8,7 +8,6 @@ import (
 )
 
 type Logger struct {
-	attrs  []any
 	logger *slog.Logger
 	level  *slog.LevelVar
 	w      io.Writer
@@ -18,18 +17,14 @@ func (l *Logger) SetLevel(level slog.Level) {
 	l.level.Set(level)
 }
 
-func (l *Logger) ClearAttrs() {
-	l.attrs = []any{}
-}
-
 func (l *Logger) SetAttrs(attrs ...slog.Attr) {
 	for _, attr := range attrs {
-		l.attrs = append(l.attrs, attr)
+		l.logger = l.logger.With(attr)
 	}
 }
 
 func (l *Logger) log(level slog.Level, msg string, args ...any) {
-	l.logger.Log(context.Background(), level, msg, append(args, l.attrs...)...)
+	l.logger.Log(context.Background(), level, msg, args...)
 }
 
 func (l *Logger) Debug(msg string, args ...any) {
