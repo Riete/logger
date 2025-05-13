@@ -7,7 +7,34 @@ import (
 	"log/slog"
 )
 
+type Option func(*Logger)
+
+func WithJSONFormat() Option {
+	return func(l *Logger) {
+		l.json = true
+	}
+}
+
+func WithLogLevel(level slog.Level) Option {
+	return func(l *Logger) {
+		l.SetLevel(level)
+	}
+}
+
+func WithMultiWriter(w io.Writer, others ...io.Writer) Option {
+	return func(l *Logger) {
+		l.w = io.MultiWriter(append(others, l.w, w)...)
+	}
+}
+
+func WithAttrs(attrs ...slog.Attr) Option {
+	return func(l *Logger) {
+		l.SetAttrs(attrs...)
+	}
+}
+
 type Logger struct {
+	json   bool
 	logger *slog.Logger
 	level  *slog.LevelVar
 	w      io.Writer
@@ -23,24 +50,24 @@ func (l *Logger) SetAttrs(attrs ...slog.Attr) {
 	}
 }
 
-func (l *Logger) log(level slog.Level, msg string, args ...any) {
+func (l *Logger) Log(level slog.Level, msg string, args ...any) {
 	l.logger.Log(context.Background(), level, msg, args...)
 }
 
 func (l *Logger) Debug(msg string, args ...any) {
-	l.log(slog.LevelDebug, msg, args...)
+	l.Log(slog.LevelDebug, msg, args...)
 }
 
 func (l *Logger) Info(msg string, args ...any) {
-	l.log(slog.LevelInfo, msg, args...)
+	l.Log(slog.LevelInfo, msg, args...)
 }
 
 func (l *Logger) Warn(msg string, args ...any) {
-	l.log(slog.LevelWarn, msg, args...)
+	l.Log(slog.LevelWarn, msg, args...)
 }
 
 func (l *Logger) Error(msg string, args ...any) {
-	l.log(slog.LevelError, msg, args...)
+	l.Log(slog.LevelError, msg, args...)
 }
 
 func (l *Logger) Write(p []byte) (int, error) {
@@ -66,28 +93,17 @@ func (l *Logger) Printf(format string, v ...any) {
 	l.Info(fmt.Sprintf(format, v...))
 }
 
-// NewJSONLogger json log format, support write to multi writer
-func NewJSONLogger(w io.Writer, others ...io.Writer) *Logger {
-	if len(others) > 0 {
-		w = io.MultiWriter(append(others, w)...)
+func New(w io.Writer, options ...Option) *Logger {
+	l := &Logger{level: new(slog.LevelVar), w: w}
+	for _, option := range options {
+		option(l)
 	}
-	level := new(slog.LevelVar)
-	return &Logger{
-		logger: slog.New(slog.NewJSONHandler(w, &slog.HandlerOptions{Level: level})),
-		level:  level,
-		w:      w,
+	var handler slog.Handler
+	if l.json {
+		handler = slog.NewJSONHandler(l.w, &slog.HandlerOptions{Level: l.level})
+	} else {
+		handler = slog.NewTextHandler(l.w, &slog.HandlerOptions{Level: l.level})
 	}
-}
-
-// NewTextLogger text log format, support write to multi writer
-func NewTextLogger(w io.Writer, others ...io.Writer) *Logger {
-	if len(others) > 0 {
-		w = io.MultiWriter(append(others, w)...)
-	}
-	level := new(slog.LevelVar)
-	return &Logger{
-		logger: slog.New(slog.NewTextHandler(w, &slog.HandlerOptions{Level: level})),
-		level:  level,
-		w:      w,
-	}
+	l.logger = slog.New(handler)
+	return l
 }
