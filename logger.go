@@ -5,13 +5,55 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"sync"
 )
+
+type Color string
+
+const (
+	// ANSI color, https://gist.github.com/iamnewton/8754917#file-bash-colors-md
+	start  Color = "\033["
+	end    Color = "\033[0m"
+	Red    Color = "31m"
+	Green  Color = "32m"
+	Yellow Color = "33m"
+	Blue   Color = "34m"
+	Purple Color = "35m"
+	Cyan   Color = "36m"
+	Gray   Color = "90m"
+)
+
+// DefaultColors overwrite or add additional level colors
+var DefaultColors = map[slog.Level]Color{
+	slog.LevelDebug: Gray,
+	slog.LevelWarn:  Yellow,
+	slog.LevelError: Red,
+}
+
+type colorWrapper struct {
+	w     io.Writer
+	level slog.Level
+}
+
+func (c colorWrapper) Write(p []byte) (int, error) {
+	color := DefaultColors[c.level]
+	if color != "" {
+		p = append([]byte(start+color), append(p, []byte(end)...)...)
+	}
+	return c.w.Write(p)
+}
 
 type Option func(*Logger)
 
 func WithJSONFormat() Option {
 	return func(l *Logger) {
 		l.json = true
+	}
+}
+
+func WithColor() Option {
+	return func(l *Logger) {
+		l.color = true
 	}
 }
 
@@ -35,9 +77,11 @@ func WithAttrs(attrs ...slog.Attr) Option {
 
 type Logger struct {
 	json   bool
+	color  bool
 	logger *slog.Logger
 	level  *slog.LevelVar
 	w      io.Writer
+	mu     sync.Mutex
 }
 
 func (l *Logger) SetLevel(level slog.Level) {
@@ -51,6 +95,13 @@ func (l *Logger) SetAttrs(attrs ...slog.Attr) {
 }
 
 func (l *Logger) Log(level slog.Level, msg string, args ...any) {
+	if l.color {
+		if wrapper, ok := l.w.(*colorWrapper); ok {
+			l.mu.Lock()
+			defer l.mu.Unlock()
+			wrapper.level = level
+		}
+	}
 	l.logger.Log(context.Background(), level, msg, args...)
 }
 
@@ -97,6 +148,9 @@ func New(w io.Writer, options ...Option) *Logger {
 	l := &Logger{level: new(slog.LevelVar), w: w}
 	for _, option := range options {
 		option(l)
+	}
+	if l.color {
+		l.w = &colorWrapper{w: l.w}
 	}
 	var handler slog.Handler
 	if l.json {
