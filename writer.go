@@ -72,42 +72,48 @@ type NetworkWriter struct {
 	err        error
 	maxBufSize int
 	buf        *bytes.Buffer
-	l          sync.RWMutex
+	mu         sync.Mutex
 }
 
 func (n *NetworkWriter) dial() {
-	n.l.Lock()
-	defer n.l.Unlock()
-	if n.err == nil && n.conn != nil {
-		return
-	}
 	n.conn, n.err = net.DialTimeout(n.network, n.addr, 5*time.Second)
 }
 
-func (n *NetworkWriter) bufWrite(p []byte) (int, error) {
-	if n.buf.Len() >= n.maxBufSize {
-		_ = n.buf.Next(len(p))
+func (n *NetworkWriter) bufWrite(p []byte) {
+	if n.maxBufSize > 0 {
+		if n.buf.Len() >= n.maxBufSize {
+			// drop old len(p) data
+			n.buf.Next(len(p))
+		}
+		n.buf.Write(p)
 	}
-	return n.buf.Write(p)
 }
 
 func (n *NetworkWriter) Write(p []byte) (int, error) {
-	var rn int
+	n.mu.Lock()
+	defer n.mu.Unlock()
 	if n.err != nil || n.conn == nil {
-		go n.dial()
-		if n.maxBufSize > 0 {
-			return n.bufWrite(p)
+		n.dial()
+		if n.err != nil {
+			n.bufWrite(p)
+			return 0, n.err
 		}
 	}
+
+	var rn int
+	var bn int
 	if n.buf.Len() > 0 {
-		_, _ = n.conn.Write(n.buf.Bytes())
+		if bn, n.err = n.conn.Write(n.buf.Bytes()); n.err != nil {
+			n.buf.Next(bn)
+			n.bufWrite(p)
+			return bn, n.err
+		}
 		n.buf.Reset()
 	}
-	rn, n.err = n.conn.Write(p)
-	if n.err != nil {
-		_, _ = n.bufWrite(p)
+	if rn, n.err = n.conn.Write(p); n.err != nil {
+		n.bufWrite(p)
 	}
-	return rn, n.err
+	return rn + bn, n.err
 }
 
 func (n *NetworkWriter) Close() error {
