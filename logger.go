@@ -105,20 +105,40 @@ func (l *Logger) Log(level slog.Level, msg string, args ...any) {
 	l.logger.Log(context.Background(), level, msg, args...)
 }
 
+func (l *Logger) Logf(level slog.Level, format string, v ...any) {
+	l.Log(level, fmt.Sprintf(format, v...))
+}
+
 func (l *Logger) Debug(msg string, args ...any) {
 	l.Log(slog.LevelDebug, msg, args...)
+}
+
+func (l *Logger) Debugf(format string, v ...any) {
+	l.Logf(slog.LevelDebug, format, v...)
 }
 
 func (l *Logger) Info(msg string, args ...any) {
 	l.Log(slog.LevelInfo, msg, args...)
 }
 
+func (l *Logger) Infof(format string, v ...any) {
+	l.Logf(slog.LevelInfo, format, v...)
+}
+
 func (l *Logger) Warn(msg string, args ...any) {
 	l.Log(slog.LevelWarn, msg, args...)
 }
 
+func (l *Logger) Warnf(format string, v ...any) {
+	l.Logf(slog.LevelWarn, format, v...)
+}
+
 func (l *Logger) Error(msg string, args ...any) {
 	l.Log(slog.LevelError, msg, args...)
+}
+
+func (l *Logger) Errorf(format string, v ...any) {
+	l.Logf(slog.LevelError, format, v...)
 }
 
 func (l *Logger) Write(p []byte) (int, error) {
@@ -141,7 +161,7 @@ func (l *Logger) Println(v ...any) {
 }
 
 func (l *Logger) Printf(format string, v ...any) {
-	l.Info(fmt.Sprintf(format, v...))
+	l.Infof(format, v...)
 }
 
 func New(w io.Writer, options ...Option) *Logger {
