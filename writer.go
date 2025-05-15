@@ -3,6 +3,7 @@ package logger
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"io"
 	"net"
 	"os"
@@ -73,9 +74,13 @@ type NetworkWriter struct {
 	maxBufSize int
 	buf        *bytes.Buffer
 	mu         sync.Mutex
+	closed     bool
 }
 
 func (n *NetworkWriter) dial() {
+	if n.closed {
+		n.err = errors.New("writer has been closed")
+	}
 	n.conn, n.err = net.DialTimeout(n.network, n.addr, 5*time.Second)
 }
 
@@ -117,6 +122,9 @@ func (n *NetworkWriter) Write(p []byte) (int, error) {
 }
 
 func (n *NetworkWriter) Close() error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.closed = true
 	if n.err == nil {
 		n.err = n.conn.Close()
 	}
