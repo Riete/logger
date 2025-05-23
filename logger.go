@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"sync"
 )
 
@@ -139,6 +140,16 @@ func (l *Logger) Error(msg string, args ...any) {
 
 func (l *Logger) Errorf(format string, v ...any) {
 	l.Logf(slog.LevelError, format, v...)
+}
+
+func (l *Logger) Fatal(msg string, args ...any) {
+	l.Error(msg, args...)
+	os.Exit(1)
+}
+
+func (l *Logger) Fatalf(format string, v ...any) {
+	l.Errorf(format, v...)
+	os.Exit(1)
 }
 
 func (l *Logger) Write(p []byte) (int, error) {
