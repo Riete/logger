@@ -27,6 +27,11 @@ const (
 	Gray   Color = "90m"
 )
 
+const (
+	defaultCallerKey  = "source"
+	defaultCallerSkip = 3
+)
+
 // DefaultColors overwrite or add additional level colors
 var DefaultColors = map[slog.Level]Color{
 	slog.LevelDebug: Gray,
@@ -86,6 +91,29 @@ func WithAttrs(attrs ...slog.Attr) Option {
 	}
 }
 
+func WithCaller(key string, skip int) Option {
+	return func(l *Logger) {
+		l.caller = &caller{enable: true, key: key, skip: skip}
+	}
+}
+
+func WithDefaultCaller() Option {
+	return func(l *Logger) {
+		l.caller = &caller{enable: true, key: defaultCallerKey, skip: defaultCallerSkip}
+	}
+}
+
+type caller struct {
+	enable bool
+	key    string
+	skip   int
+}
+
+func (c *caller) caller() string {
+	_, file, line, _ := runtime.Caller(c.skip)
+	return fmt.Sprintf("%s:%d", file, line)
+}
+
 type Logger struct {
 	json    bool
 	color   bool
@@ -94,6 +122,7 @@ type Logger struct {
 	closers []io.Closer
 	w       io.Writer
 	mu      sync.Mutex
+	caller  *caller
 }
 
 func (l *Logger) SetLevel(level slog.Level) {
@@ -114,11 +143,10 @@ func (l *Logger) Log(level slog.Level, msg string, args ...any) {
 			wrapper.level = level
 		}
 	}
+	if l.caller.enable {
+		args = append(args, l.caller.key, l.caller.caller())
+	}
 	l.logger.Log(context.Background(), level, msg, args...)
-}
-
-func (l *Logger) Logf(level slog.Level, format string, v ...any) {
-	l.Log(level, fmt.Sprintf(format, v...))
 }
 
 func (l *Logger) Debug(msg string, args ...any) {
@@ -126,7 +154,7 @@ func (l *Logger) Debug(msg string, args ...any) {
 }
 
 func (l *Logger) Debugf(format string, v ...any) {
-	l.Logf(slog.LevelDebug, format, v...)
+	l.Log(slog.LevelDebug, fmt.Sprintf(format, v...))
 }
 
 func (l *Logger) Info(msg string, args ...any) {
@@ -134,7 +162,7 @@ func (l *Logger) Info(msg string, args ...any) {
 }
 
 func (l *Logger) Infof(format string, v ...any) {
-	l.Logf(slog.LevelInfo, format, v...)
+	l.Log(slog.LevelInfo, fmt.Sprintf(format, v...))
 }
 
 func (l *Logger) Warn(msg string, args ...any) {
@@ -142,7 +170,7 @@ func (l *Logger) Warn(msg string, args ...any) {
 }
 
 func (l *Logger) Warnf(format string, v ...any) {
-	l.Logf(slog.LevelWarn, format, v...)
+	l.Log(slog.LevelWarn, fmt.Sprintf(format, v...))
 }
 
 func (l *Logger) Error(msg string, args ...any) {
@@ -150,48 +178,56 @@ func (l *Logger) Error(msg string, args ...any) {
 }
 
 func (l *Logger) Errorf(format string, v ...any) {
-	l.Logf(slog.LevelError, format, v...)
+	l.Log(slog.LevelError, fmt.Sprintf(format, v...))
 }
 
 func (l *Logger) Fatal(msg string, args ...any) {
-	l.Error(msg, args...)
+	l.Log(slog.LevelError, msg, args...)
 	l.Close()
 	os.Exit(1)
 }
 
 func (l *Logger) Fatalf(format string, v ...any) {
-	l.Errorf(format, v...)
+	l.Log(slog.LevelError, fmt.Sprintf(format, v...))
 	l.Close()
 	os.Exit(1)
+}
+
+func (l *Logger) Print(v ...any) {
+	if len(v) == 0 {
+		l.Log(slog.LevelInfo, "")
+	}
+	msg, ok := v[0].(string)
+	if !ok {
+		msg = fmt.Sprintf("%v", v[0])
+	}
+	l.Log(slog.LevelInfo, msg, v[1:]...)
+}
+
+func (l *Logger) Println(v ...any) {
+	if len(v) == 0 {
+		l.Log(slog.LevelInfo, "")
+	}
+	msg, ok := v[0].(string)
+	if !ok {
+		msg = fmt.Sprintf("%v", v[0])
+	}
+	l.Log(slog.LevelInfo, msg, v[1:]...)
+}
+
+func (l *Logger) Printf(format string, v ...any) {
+	l.Log(slog.LevelInfo, fmt.Sprintf(format, v...))
 }
 
 func (l *Logger) Write(p []byte) (int, error) {
 	return l.w.Write(p)
 }
 
-func (l *Logger) Close() {
+func (l *Logger) Close() error {
 	for _, c := range l.closers {
 		_ = c.Close()
 	}
-}
-
-func (l *Logger) Print(v ...any) {
-	if len(v) == 0 {
-		l.Info("")
-	}
-	msg, ok := v[0].(string)
-	if !ok {
-		msg = fmt.Sprintf("%v", v[0])
-	}
-	l.Info(msg, v[1:]...)
-}
-
-func (l *Logger) Println(v ...any) {
-	l.Print(v...)
-}
-
-func (l *Logger) Printf(format string, v ...any) {
-	l.Infof(format, v...)
+	return nil
 }
 
 func New(w io.Writer, options ...Option) *Logger {

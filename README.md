@@ -24,6 +24,8 @@ func main() {
 		logger.WithMultiWriter(os.Stdout),   // log to multi target
 		logger.WithColor(),                  // use ansi color
 		logger.WithLogLevel(slog.LevelInfo), // default log level, lower than it will be ignored
+		logger.WithDefaultCaller(),          // source code position of the log statement with key "source" and skip 3 
+		logger.WithCaller("source", 4),      // custom key and skip(more than 3 if wrapped) 
 	)
 	log.Info("info log")
 	log.Warn("warn log")
