@@ -19,12 +19,12 @@ func main() {
     
     log := logger.New(
         fw,
-        logger.WithJSONFormat(),             // use json format
+        logger.WithJSONFormat(),                 // use json format
         logger.WithMultiWriter(os.Stdout, nw),   // log to multi target
-        logger.WithColor(),                  // use ansi color
-        logger.WithLogLevel(slog.LevelInfo), // default log level, lower than it will be ignored
-        logger.WithDefaultCaller(),          // source code position of the log statement with key "source" and skip 3 
-        logger.WithCaller("source", 4),      // custom key and skip(more than 3 if wrapped) 
+        logger.WithColor(),                      // use ansi color
+        logger.WithLogLevel(slog.LevelInfo),     // default log level, lower than it will be ignored
+        logger.WithDefaultCaller(),              // source code position of the log statement with key "source" and skip 3 
+        logger.WithCaller("source", 4),          // custom key and skip(more than 3 if wrapped) 
     )
     
     defer fw.Close() // flush buffered data 
@@ -32,13 +32,13 @@ func main() {
     or
     defer log.Close() // close all io.Closer
     
-    log.Debug("debug log"
+    log.Debug("debug log")
     log.Info("info log")
     log.Warn("warn log")
     log.Error("error log")
     log.Fatal("fatal log")
     
-    log.Debugf("%s", "debug log"
+    log.Debugf("%s", "debug log")
     log.Infof("%s", "info log")
     log.Warnf("%s", "warn log")
     log.Errorf("%s", "error log")
