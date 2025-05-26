@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"runtime"
 	"sync"
 )
 
@@ -15,12 +16,14 @@ const (
 	// ANSI color, https://gist.github.com/iamnewton/8754917#file-bash-colors-md
 	start  Color = "\033["
 	end    Color = "\033[0m"
+	Black  Color = "30m"
 	Red    Color = "31m"
 	Green  Color = "32m"
 	Yellow Color = "33m"
 	Blue   Color = "34m"
 	Purple Color = "35m"
 	Cyan   Color = "36m"
+	White  Color = "37m"
 	Gray   Color = "90m"
 )
 
@@ -34,12 +37,14 @@ var DefaultColors = map[slog.Level]Color{
 type colorWrapper struct {
 	w     io.Writer
 	level slog.Level
+	lf    string
 }
 
-func (c colorWrapper) Write(p []byte) (int, error) {
+func (c *colorWrapper) Write(p []byte) (int, error) {
 	color := DefaultColors[c.level]
 	if color != "" {
-		p = append([]byte(start+color), append(p, []byte(end)...)...)
+		p = p[0 : len(p)-len(c.lf)]
+		p = append([]byte(start+color), append(p, []byte(string(end)+c.lf)...)...)
 	}
 	return c.w.Write(p)
 }
@@ -67,6 +72,11 @@ func WithLogLevel(level slog.Level) Option {
 func WithMultiWriter(w io.Writer, others ...io.Writer) Option {
 	return func(l *Logger) {
 		l.w = io.MultiWriter(append(others, l.w, w)...)
+		for _, other := range append(others, w) {
+			if closer, ok := other.(io.Closer); ok {
+				l.closers = append(l.closers, closer)
+			}
+		}
 	}
 }
 
@@ -77,12 +87,13 @@ func WithAttrs(attrs ...slog.Attr) Option {
 }
 
 type Logger struct {
-	json   bool
-	color  bool
-	logger *slog.Logger
-	level  *slog.LevelVar
-	w      io.Writer
-	mu     sync.Mutex
+	json    bool
+	color   bool
+	logger  *slog.Logger
+	level   *slog.LevelVar
+	closers []io.Closer
+	w       io.Writer
+	mu      sync.Mutex
 }
 
 func (l *Logger) SetLevel(level slog.Level) {
@@ -144,16 +155,24 @@ func (l *Logger) Errorf(format string, v ...any) {
 
 func (l *Logger) Fatal(msg string, args ...any) {
 	l.Error(msg, args...)
+	l.Close()
 	os.Exit(1)
 }
 
 func (l *Logger) Fatalf(format string, v ...any) {
 	l.Errorf(format, v...)
+	l.Close()
 	os.Exit(1)
 }
 
 func (l *Logger) Write(p []byte) (int, error) {
 	return l.w.Write(p)
+}
+
+func (l *Logger) Close() {
+	for _, c := range l.closers {
+		_ = c.Close()
+	}
 }
 
 func (l *Logger) Print(v ...any) {
@@ -177,11 +196,18 @@ func (l *Logger) Printf(format string, v ...any) {
 
 func New(w io.Writer, options ...Option) *Logger {
 	l := &Logger{level: new(slog.LevelVar), w: w}
+	if closer, ok := w.(io.Closer); ok {
+		l.closers = append(l.closers, closer)
+	}
 	for _, option := range options {
 		option(l)
 	}
 	if l.color {
-		l.w = &colorWrapper{w: l.w}
+		if runtime.GOOS == "windows" {
+			l.w = &colorWrapper{w: l.w, lf: "\r\n"}
+		} else {
+			l.w = &colorWrapper{w: l.w, lf: "\n"}
+		}
 	}
 	var handler slog.Handler
 	if l.json {
