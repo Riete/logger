@@ -23,8 +23,8 @@ func main() {
         logger.WithMultiWriter(os.Stdout, nw),   // log to multi target
         logger.WithColor(),                      // use ansi color
         logger.WithLogLevel(slog.LevelInfo),     // default log level, lower than it will be ignored
-        logger.WithDefaultCaller(),              // source code position of the log statement with key "source" and skip 3 
-        logger.WithCaller("source", 4),          // custom key and skip(more than 3 if wrapped) 
+        logger.WithDisableCaller(),              // disable log source code position of the log statement
+        logger.WithCaller("source", 4),          // custom key and skip(more than 3 if wrapped), default is "source" and 3 
     )
     
     defer fw.Close() // flush buffered data 
