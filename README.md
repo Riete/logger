@@ -14,20 +14,29 @@ func main() {
     // create a file writer with DefaultFileRotator
     fw := logger.NewFileWriter("logs/test.log", logger.DefaultFileRotator)
     
-    // create a network(udp or tcp) writer, 
+    // create a buffer writer
+    bw := logger.NewBufWriter(
+        fw,                                      // underlying writer, here use previously created "fw"
+        logger.WithBufSize(100),                 // set buf size, default is 4096
+        logger.WithFlushInterval(time.Second),   // set flush interval, default is 1s
+    )
+    
+    // create a network(udp or tcp) writer
     nw := logger.NewNetworkWriter("tcp", "127.0.0.1", 10*logger.SizeMiB)
     
     log := logger.New(
-        fw,
+        bw,
         logger.WithJSONFormat(),                 // use json format
         logger.WithMultiWriter(os.Stdout, nw),   // log to multi target
         logger.WithColor(),                      // use ansi color
         logger.WithLogLevel(slog.LevelInfo),     // default log level, lower than it will be ignored
-        logger.WithDisableCaller(),              // disable log source code position of the log statement
-        logger.WithCaller("source", 4),          // custom key and skip(more than 3 if wrapped), default is "source" and 3 
+        logger.WithDisableCaller(),              // disable log source code position of the log statement, default is enable
+        logger.WithCaller("source", 4),          // set key and skip(more than 3 if wrapped), default is "source" and 3 
+        logger.WithAttr(slog.Attr{})             // set global attr 
     )
     
-    defer fw.Close() // flush buffered data 
+    defer fw.Close() // close opened file
+    defer bw.Close() // flush buffered data, and close underlying writer
     defer nw.Close() // close network connection
     or
     defer log.Close() // close all io.Closer
@@ -43,7 +52,6 @@ func main() {
     log.Warnf("%s", "warn log")
     log.Errorf("%s", "error log")
     log.Fatalf("%s", "fatal log")
-
 }
 
 ```

@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"runtime"
+	"time"
 )
 
 const (
@@ -72,4 +73,18 @@ type caller struct {
 func (c *caller) caller() string {
 	_, file, line, _ := runtime.Caller(c.skip)
 	return fmt.Sprintf("%s:%d", file, line)
+}
+
+type BufWriterOption func(*BufWriter)
+
+func WithBufSize(s int) BufWriterOption {
+	return func(b *BufWriter) {
+		b.bufSize = s
+	}
+}
+
+func WithFlushInterval(t time.Duration) BufWriterOption {
+	return func(b *BufWriter) {
+		b.interval = t
+	}
 }
