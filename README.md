@@ -29,14 +29,14 @@ func main() {
         logger.WithJSONFormat(),                 // use json format
         logger.WithMultiWriter(os.Stdout, nw),   // log to multi target
         logger.WithColor(),                      // use ansi color
-        logger.WithLogLevel(slog.LevelInfo),     // default log level, lower than it will be ignored
+        logger.WithLogLevel(slog.LevelInfo),     // set log level, default is info, lower than it will be ignored
         logger.WithDisableCaller(),              // disable log source code position of the log statement, default is enable
         logger.WithCaller("source", 4),          // set key and skip(more than 3 if wrapped), default is "source" and 3 
-        logger.WithAttr(slog.Attr{})             // set global attr 
+        logger.WithAttr(slog.Attr{})             // set additional global attr 
     )
     
     defer fw.Close() // close opened file
-    defer bw.Close() // flush buffered data, and close underlying writer
+    defer bw.Close() // flush buffered data, and call underlying writer.Close() if possible
     defer nw.Close() // close network connection
     or
     defer log.Close() // close all io.Closer

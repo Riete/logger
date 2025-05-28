@@ -57,7 +57,7 @@ func NewFileWriter(path string, rotator Rotator) io.WriteCloser {
 }
 
 type BufWriter struct {
-	w        io.WriteCloser
+	w        io.Writer
 	bw       *bufio.Writer
 	bufSize  int
 	interval time.Duration
@@ -91,10 +91,13 @@ func (b *BufWriter) Write(p []byte) (int, error) {
 func (b *BufWriter) Close() error {
 	close(b.stop)
 	_ = b.bw.Flush()
-	return b.w.Close()
+	if c, ok := b.w.(io.Closer); ok {
+		return c.Close()
+	}
+	return nil
 }
 
-func NewBufWriter(w io.WriteCloser, options ...BufWriterOption) io.WriteCloser {
+func NewBufWriter(w io.Writer, options ...BufWriterOption) io.WriteCloser {
 	b := &BufWriter{w: w, bufSize: 4096, interval: time.Second, stop: make(chan struct{})}
 	for _, option := range options {
 		option(b)
