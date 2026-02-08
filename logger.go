@@ -40,7 +40,7 @@ func (l *Logger) Log(level slog.Level, msg string, args ...any) {
 		}
 	}
 	if l.caller.enable {
-		args = append([]any{l.caller.key, l.caller.caller()}, args...)
+		args = append(args, l.caller.key, l.caller.caller())
 	}
 	l.logger.Log(context.Background(), level, msg, args...)
 }
