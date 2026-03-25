@@ -31,7 +31,7 @@ func (l *Logger) SetAttrs(attrs ...slog.Attr) {
 	}
 }
 
-func (l *Logger) Log(level slog.Level, msg string, args ...any) {
+func (l *Logger) log(level slog.Level, msg string, args ...any) {
 	if l.color {
 		if cw, ok := l.w.(*colorWriter); ok {
 			l.mu.Lock()
@@ -45,46 +45,50 @@ func (l *Logger) Log(level slog.Level, msg string, args ...any) {
 	l.logger.Log(context.Background(), level, msg, args...)
 }
 
+func (l *Logger) Log(level slog.Level, msg string, args ...any) {
+	l.log(level, msg, args...)
+}
+
 func (l *Logger) Debug(msg string, args ...any) {
-	l.Log(slog.LevelDebug, msg, args...)
+	l.log(slog.LevelDebug, msg, args...)
 }
 
 func (l *Logger) Debugf(format string, v ...any) {
-	l.Log(slog.LevelDebug, fmt.Sprintf(format, v...))
+	l.log(slog.LevelDebug, fmt.Sprintf(format, v...))
 }
 
 func (l *Logger) Info(msg string, args ...any) {
-	l.Log(slog.LevelInfo, msg, args...)
+	l.log(slog.LevelInfo, msg, args...)
 }
 
 func (l *Logger) Infof(format string, v ...any) {
-	l.Log(slog.LevelInfo, fmt.Sprintf(format, v...))
+	l.log(slog.LevelInfo, fmt.Sprintf(format, v...))
 }
 
 func (l *Logger) Warn(msg string, args ...any) {
-	l.Log(slog.LevelWarn, msg, args...)
+	l.log(slog.LevelWarn, msg, args...)
 }
 
 func (l *Logger) Warnf(format string, v ...any) {
-	l.Log(slog.LevelWarn, fmt.Sprintf(format, v...))
+	l.log(slog.LevelWarn, fmt.Sprintf(format, v...))
 }
 
 func (l *Logger) Error(msg string, args ...any) {
-	l.Log(slog.LevelError, msg, args...)
+	l.log(slog.LevelError, msg, args...)
 }
 
 func (l *Logger) Errorf(format string, v ...any) {
-	l.Log(slog.LevelError, fmt.Sprintf(format, v...))
+	l.log(slog.LevelError, fmt.Sprintf(format, v...))
 }
 
 func (l *Logger) Fatal(msg string, args ...any) {
-	l.Log(slog.LevelError, msg, args...)
+	l.log(slog.LevelError, msg, args...)
 	_ = l.Close()
 	os.Exit(1)
 }
 
 func (l *Logger) Fatalf(format string, v ...any) {
-	l.Log(slog.LevelError, fmt.Sprintf(format, v...))
+	l.log(slog.LevelError, fmt.Sprintf(format, v...))
 	_ = l.Close()
 	os.Exit(1)
 }
@@ -97,7 +101,7 @@ func (l *Logger) Print(v ...any) {
 	if !ok {
 		msg = fmt.Sprintf("%v", v[0])
 	}
-	l.Log(slog.LevelInfo, msg, v[1:]...)
+	l.log(slog.LevelInfo, msg, v[1:]...)
 }
 
 func (l *Logger) Println(v ...any) {
@@ -108,11 +112,11 @@ func (l *Logger) Println(v ...any) {
 	if !ok {
 		msg = fmt.Sprintf("%v", v[0])
 	}
-	l.Log(slog.LevelInfo, msg, v[1:]...)
+	l.log(slog.LevelInfo, msg, v[1:]...)
 }
 
 func (l *Logger) Printf(format string, v ...any) {
-	l.Log(slog.LevelInfo, fmt.Sprintf(format, v...))
+	l.log(slog.LevelInfo, fmt.Sprintf(format, v...))
 }
 
 func (l *Logger) Write(p []byte) (int, error) {
