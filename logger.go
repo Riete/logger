@@ -49,6 +49,10 @@ func (l *Logger) Log(level slog.Level, msg string, args ...any) {
 	l.log(level, msg, args...)
 }
 
+func (l *Logger) Logf(level slog.Level, format string, v ...any) {
+	l.log(level, fmt.Sprintf(format, v...))
+}
+
 func (l *Logger) Debug(msg string, args ...any) {
 	l.log(slog.LevelDebug, msg, args...)
 }
