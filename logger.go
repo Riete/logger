@@ -7,7 +7,14 @@ import (
 	"log/slog"
 	"os"
 	"runtime"
+	"slices"
 	"sync"
+)
+
+const (
+	LevelTrace      slog.Level = slog.LevelDebug - 4
+	LevelNotice     slog.Level = slog.LevelInfo + 2
+	DefaultTraceKey            = "trace_id"
 )
 
 type Logger struct {
@@ -53,6 +60,59 @@ func (l *Logger) Logf(level slog.Level, format string, v ...any) {
 	l.log(level, fmt.Sprintf(format, v...))
 }
 
+func (l *Logger) Trace(ctx context.Context, msg string, args ...any) {
+	l.log(LevelTrace, msg, append([]any{DefaultTraceKey, ctx.Value(DefaultTraceKey)}, args...)...)
+}
+
+func (l *Logger) Tracef(ctx context.Context, format string, v ...any) {
+	l.log(LevelTrace, fmt.Sprintf(format, v...), DefaultTraceKey, ctx.Value(DefaultTraceKey))
+}
+
+func (l *Logger) TraceFunc(ctx context.Context, f func(context.Context) map[string]any, msg string, args ...any) {
+	if f == nil {
+		l.log(LevelTrace, msg, args...)
+		return
+	}
+	traceMap := f(ctx)
+	if len(traceMap) == 0 {
+		l.log(LevelTrace, msg, args...)
+		return
+	}
+	newArgs := make([]any, 0, 2*len(traceMap)+len(args))
+	traceKeys := make([]string, 0, len(traceMap))
+	for key := range traceMap {
+		traceKeys = append(traceKeys, key)
+	}
+	slices.Sort(traceKeys)
+	for _, key := range traceKeys {
+		newArgs = append(newArgs, key, traceMap[key])
+	}
+	newArgs = append(newArgs, args...)
+	l.log(LevelTrace, msg, newArgs...)
+}
+
+func (l *Logger) TraceFuncf(ctx context.Context, f func(context.Context) map[string]any, format string, v ...any) {
+	if f == nil {
+		l.log(LevelTrace, fmt.Sprintf(format, v...))
+		return
+	}
+	traceMap := f(ctx)
+	if len(traceMap) == 0 {
+		l.log(LevelTrace, fmt.Sprintf(format, v...))
+		return
+	}
+	args := make([]any, 0, 2*len(traceMap))
+	traceKeys := make([]string, 0, len(traceMap))
+	for key := range traceMap {
+		traceKeys = append(traceKeys, key)
+	}
+	slices.Sort(traceKeys)
+	for _, key := range traceKeys {
+		args = append(args, key, traceMap[key])
+	}
+	l.log(LevelTrace, fmt.Sprintf(format, v...), args...)
+}
+
 func (l *Logger) Debug(msg string, args ...any) {
 	l.log(slog.LevelDebug, msg, args...)
 }
@@ -67,6 +127,14 @@ func (l *Logger) Info(msg string, args ...any) {
 
 func (l *Logger) Infof(format string, v ...any) {
 	l.log(slog.LevelInfo, fmt.Sprintf(format, v...))
+}
+
+func (l *Logger) Notice(msg string, args ...any) {
+	l.log(LevelNotice, msg, args...)
+}
+
+func (l *Logger) Noticef(format string, v ...any) {
+	l.log(LevelNotice, fmt.Sprintf(format, v...))
 }
 
 func (l *Logger) Warn(msg string, args ...any) {
@@ -149,11 +217,28 @@ func New(w io.Writer, options ...Option) *Logger {
 			l.w = &colorWriter{w: l.w, lf: "\n"}
 		}
 	}
+	levelReplace := func(groups []string, a slog.Attr) slog.Attr {
+		if a.Key == slog.LevelKey {
+			level, ok := a.Value.Any().(slog.Level)
+			if !ok {
+				return a
+			}
+			switch level {
+			case LevelTrace:
+				return slog.String(a.Key, "TRACE")
+			case LevelNotice:
+				return slog.String(a.Key, "NOTICE")
+			}
+			return a
+		}
+		return a
+	}
+
 	var handler slog.Handler
 	if l.json {
-		handler = slog.NewJSONHandler(l.w, &slog.HandlerOptions{Level: l.level})
+		handler = slog.NewJSONHandler(l.w, &slog.HandlerOptions{Level: l.level, ReplaceAttr: levelReplace})
 	} else {
-		handler = slog.NewTextHandler(l.w, &slog.HandlerOptions{Level: l.level})
+		handler = slog.NewTextHandler(l.w, &slog.HandlerOptions{Level: l.level, ReplaceAttr: levelReplace})
 	}
 	l.logger = slog.New(handler)
 	return l

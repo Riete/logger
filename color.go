@@ -25,7 +25,9 @@ const (
 
 // DefaultColors overwrite or add additional level colors
 var DefaultColors = map[slog.Level]Color{
+	LevelTrace:      Cyan,
 	slog.LevelDebug: Gray,
+	LevelNotice:     Purple,
 	slog.LevelWarn:  Yellow,
 	slog.LevelError: Red,
 }
