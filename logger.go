@@ -7,25 +7,24 @@ import (
 	"log/slog"
 	"os"
 	"runtime"
-	"slices"
 	"sync"
 )
 
 const (
-	LevelTrace      slog.Level = slog.LevelDebug - 4
-	LevelNotice     slog.Level = slog.LevelInfo + 2
-	DefaultTraceKey            = "trace_id"
+	LevelTrace  slog.Level = slog.LevelDebug - 4
+	LevelNotice slog.Level = slog.LevelInfo + 2
 )
 
 type Logger struct {
-	json    bool
-	color   bool
-	logger  *slog.Logger
-	level   *slog.LevelVar
-	closers []io.Closer
-	w       io.Writer
-	mu      sync.Mutex
-	caller  caller
+	json     bool
+	color    bool
+	logger   *slog.Logger
+	level    *slog.LevelVar
+	closers  []io.Closer
+	w        io.Writer
+	mu       sync.Mutex
+	caller   caller
+	traceKey string
 }
 
 func (l *Logger) SetLevel(level slog.Level) {
@@ -60,57 +59,12 @@ func (l *Logger) Logf(level slog.Level, format string, v ...any) {
 	l.log(level, fmt.Sprintf(format, v...))
 }
 
-func (l *Logger) Trace(ctx context.Context, msg string, args ...any) {
-	l.log(LevelTrace, msg, append([]any{DefaultTraceKey, ctx.Value(DefaultTraceKey)}, args...)...)
+func (l *Logger) Trace(ctx context.Context, level slog.Level, msg string, args ...any) {
+	l.log(level, msg, append([]any{l.traceKey, ctx.Value(l.traceKey)}, args...)...)
 }
 
-func (l *Logger) Tracef(ctx context.Context, format string, v ...any) {
-	l.log(LevelTrace, fmt.Sprintf(format, v...), DefaultTraceKey, ctx.Value(DefaultTraceKey))
-}
-
-func (l *Logger) TraceFunc(ctx context.Context, f func(context.Context) map[string]any, msg string, args ...any) {
-	if f == nil {
-		l.log(LevelTrace, msg, args...)
-		return
-	}
-	traceMap := f(ctx)
-	if len(traceMap) == 0 {
-		l.log(LevelTrace, msg, args...)
-		return
-	}
-	newArgs := make([]any, 0, 2*len(traceMap)+len(args))
-	traceKeys := make([]string, 0, len(traceMap))
-	for key := range traceMap {
-		traceKeys = append(traceKeys, key)
-	}
-	slices.Sort(traceKeys)
-	for _, key := range traceKeys {
-		newArgs = append(newArgs, key, traceMap[key])
-	}
-	newArgs = append(newArgs, args...)
-	l.log(LevelTrace, msg, newArgs...)
-}
-
-func (l *Logger) TraceFuncf(ctx context.Context, f func(context.Context) map[string]any, format string, v ...any) {
-	if f == nil {
-		l.log(LevelTrace, fmt.Sprintf(format, v...))
-		return
-	}
-	traceMap := f(ctx)
-	if len(traceMap) == 0 {
-		l.log(LevelTrace, fmt.Sprintf(format, v...))
-		return
-	}
-	args := make([]any, 0, 2*len(traceMap))
-	traceKeys := make([]string, 0, len(traceMap))
-	for key := range traceMap {
-		traceKeys = append(traceKeys, key)
-	}
-	slices.Sort(traceKeys)
-	for _, key := range traceKeys {
-		args = append(args, key, traceMap[key])
-	}
-	l.log(LevelTrace, fmt.Sprintf(format, v...), args...)
+func (l *Logger) Tracef(ctx context.Context, level slog.Level, format string, v ...any) {
+	l.log(level, fmt.Sprintf(format, v...), l.traceKey, ctx.Value(l.traceKey))
 }
 
 func (l *Logger) Debug(msg string, args ...any) {
@@ -203,7 +157,7 @@ func (l *Logger) Close() error {
 }
 
 func New(w io.Writer, options ...Option) *Logger {
-	l := &Logger{level: new(slog.LevelVar), w: w, caller: defaultCaller}
+	l := &Logger{level: new(slog.LevelVar), w: w, caller: defaultCaller, traceKey: "trace_id"}
 	if closer, ok := w.(io.Closer); ok {
 		l.closers = append(l.closers, closer)
 	}
