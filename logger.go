@@ -24,7 +24,7 @@ type Logger struct {
 	w        io.Writer
 	mu       sync.Mutex
 	caller   caller
-	traceKey string
+	traceKey any
 }
 
 func (l *Logger) SetLevel(level slog.Level) {
@@ -60,11 +60,11 @@ func (l *Logger) Logf(level slog.Level, format string, v ...any) {
 }
 
 func (l *Logger) Trace(ctx context.Context, level slog.Level, msg string, args ...any) {
-	l.log(level, msg, append([]any{l.traceKey, ctx.Value(l.traceKey)}, args...)...)
+	l.log(level, msg, append([]any{"trace_id", ctx.Value(l.traceKey)}, args...)...)
 }
 
 func (l *Logger) Tracef(ctx context.Context, level slog.Level, format string, v ...any) {
-	l.log(level, fmt.Sprintf(format, v...), l.traceKey, ctx.Value(l.traceKey))
+	l.log(level, fmt.Sprintf(format, v...), "trace_id", ctx.Value(l.traceKey))
 }
 
 func (l *Logger) Debug(msg string, args ...any) {

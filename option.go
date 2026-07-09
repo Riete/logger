@@ -63,7 +63,7 @@ func WithDisableCaller() Option {
 		l.caller = caller{}
 	}
 }
-func WithTraceKey(key string) Option {
+func WithTraceKey(key any) Option {
 	return func(l *Logger) {
 		l.traceKey = key
 	}
